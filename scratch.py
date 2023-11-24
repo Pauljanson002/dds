@@ -17,7 +17,7 @@ import argparse
 def main(args):
     args = OmegaConf.to_container(args, resolve=True)
     args = argparse.Namespace(**args)
-    img_name = '/home/paulj/projects/collosal/dds/reference_images/sitting.png'
+    img_name = '/home/paulj/projects/collosal/dds/reference_images/running.png'
     prompt_ref = args.prompt_ref    
     prompt = args.prompt
     guidance_scale = args.guidance_scale
@@ -25,7 +25,7 @@ def main(args):
 
     sd_utils.seed_everything(0)
     wandb.init(
-            project="collosal", name=args.name ,mode=args.wandb,config=vars(args)
+            project="collosal", name="dds_test",mode="disabled",config=vars(args)
         )
     guidance_model = sd_utils.StableDiffusion('cuda', fp16=True, vram_O=False,args=args)
     guidance_model.eval()
@@ -54,20 +54,19 @@ def main(args):
 
         return batch_img_tensor
 
-    # img_ref = load_image_as_tensor(img_name).cuda()
-    img_ref = guidance_model.prompt_to_img(prompt_ref,"",512,512,50)
-    img_ref = img_ref.cuda()
+    img_ref = load_image_as_tensor(img_name).cuda()
     img_ref.requires_grad = False
 
     as_latent = True
     latent_size = args.latent_size
-    latent = torch.randn(1, 4, latent_size, latent_size, requires_grad=True, device="cuda")
+    latent = torch.randn(1, 4,1, latent_size, latent_size, requires_grad=True, device="cuda")
 
 
     with torch.no_grad():
         text_z_ref = torch.cat([guidance_model.get_text_embeds(""), guidance_model.get_text_embeds(prompt_ref), ], dim=0)
         text_z = torch.cat([guidance_model.get_text_embeds(""), guidance_model.get_text_embeds(prompt), ], dim=0)
         latent_ref = guidance_model.encode_imgs(img_ref)
+        latent_ref = latent_ref.unsqueeze(2)
         latent[:] = latent_ref
 
     # optim = torch.optim.Adam([latent], lr=0.01)
@@ -92,7 +91,7 @@ def main(args):
                 if as_latent:
                     wandb.log({"result": wandb.Image(guidance_model.decode_latents(x)[0])})
                     from torchvision.utils import save_image
-                    save_image(guidance_model.decode_latents(x)[0], f"/home/paulj/projects/collosal/4D-Humans/example_data/images/result.png")
+                    save_image(guidance_model.decode_latents(x)[0], "result.png")
                     pred = guidance_model.decode_latents(x)[0].detach()
                     pred = pred.mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to("cpu", torch.uint8).numpy()
                     animation.append(pred)

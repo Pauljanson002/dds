@@ -1,0 +1,5 @@
+# python dds_smpl.py loss="dds" guidance_scale=10 epochs=50 prompt="A fat person front view" name=dds_smpl_dds_10_50_A_fat_person_front_view wandb_mode=disabled
+python dds_smpl.py loss="dds" guidance_scale=7.5 epochs=50 prompt="A front view of a tall person in T pose  realistic  3D model  photorealistic" name=dds_smpl_dds_10_50_A_thin_person_front_view wandb_mode=online norm_coeff=0.1 lr=1e-2 tags=[dds,smplx]
+# python dds_smpl.py loss="dds" guidance_scale=10 epochs=50 prompt="A short person front view" name=dds_smpl_dds_10_50_A_short_person_front_view
+# python dds_smpl.py loss="dds" guidance_scale=10 epochs=50 prompt="A tall person front view" name=dds_smpl_dds_10_50_A_tall_person_front_view
+# python dds_smpl.py loss="dds" guidance_scale=10 epochs=50 prompt="An Atheletic person front view" name=dds_smpl_dds_10_50_An_Atheletic_person_front_view

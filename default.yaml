@@ -1,0 +1,14 @@
+guidance_scale: 10
+epochs: 100
+prompt_ref: "A front view of a person in T pose  realistic  3D model  photorealistic"
+prompt: "A front view of a fat person in T pose  realistic  3D model  photorealistic"
+guidance_model: "stable_diffusion"
+loss: "dds"
+latent_size: 64
+name: "dds"
+wandb: "online"
+wandb_mode: "online"
+tags: []
+norm_coeff: 0.1
+lr: 1e-2
+clip_grad: False

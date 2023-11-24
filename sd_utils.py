@@ -1,5 +1,5 @@
 from transformers import CLIPTextModel, CLIPTokenizer, logging
-from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler, DDIMScheduler, StableDiffusionPipeline
+from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler, DDIMScheduler, StableDiffusionPipeline,DiffusionPipeline,DPMSolverMultistepScheduler
 from diffusers.utils.import_utils import is_xformers_available
 from os.path import isfile
 
@@ -65,7 +65,7 @@ class StableDiffusion(nn.Module):
     which is an image-conditional generative model that can produce high fidelity images from text prompts. 
     The class has various methods, including `__init__`, `get_text_embeds`, `train_step`, `produce_latents`, `decode_latents`, and `prompt_to_img`. 
     """
-    def __init__(self, device, fp16, vram_O, sd_version='2.1', hf_key=None, t_range=[0.02, 0.98]):
+    def __init__(self, device, fp16, vram_O, sd_version='2.1', hf_key=None, t_range=[0.02, 0.98],args=None):
         """
 The `__init__` method initializes the class and loads a Stable Diffusion model using the specified version number, 
 and also sets the precision of the model to either float16 or float32 depending on the `fp16` parameter. 
@@ -95,9 +95,17 @@ as well as a `DDIMScheduler` object that controls the number of training steps.
             raise ValueError(f'Stable-diffusion version {self.sd_version} not supported.')
 
         self.precision_t = torch.float16 if fp16 else torch.float32
-
+        if args == None:
+            args = argparse.Namespace(guidance_model="stable_diffusion")
+        self.args = args
         # Create model
-        pipe = StableDiffusionPipeline.from_pretrained(model_key, torch_dtype=self.precision_t)
+        if args is not None:
+            if args.guidance_model == "stable_diffusion":
+                pipe = StableDiffusionPipeline.from_pretrained(model_key, torch_dtype=self.precision_t)
+            elif args.guidance_model == "zero_scope":
+                pipe = DiffusionPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
+        else:
+            pipe = StableDiffusionPipeline.from_pretrained(model_key, torch_dtype=self.precision_t)
 
         if isfile('./unet_traced.pt'):
             # use jitted unet
@@ -127,7 +135,10 @@ as well as a `DDIMScheduler` object that controls the number of training steps.
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
 
-        self.scheduler = DDIMScheduler.from_pretrained(model_key, subfolder="scheduler", torch_dtype=self.precision_t)
+        if args.guidance_model == "stable_diffusion":
+            self.scheduler = DDIMScheduler.from_pretrained(model_key, subfolder="scheduler", torch_dtype=self.precision_t)
+        elif args.guidance_model == "zero_scope":
+            self.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * t_range[0])
@@ -169,6 +180,8 @@ The `get_text_embeds` method takes a text prompt as input and returns the embedd
             #torch.save(latent_model_input, "train_latent_model_input.pt")
             #torch.save(t, "train_t.pt")
             #torch.save(text_embeddings, "train_text_embeddings.pt")
+            # if self.args.guidance_model == "zero_scope":
+            #     latent_model_input = latent_model_input.unsqueeze(2)            
             noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
         # perform guidance (high scale from paper!)
@@ -274,7 +287,8 @@ It also includes a guidance parameter that can help generate more accurate image
         """
 
         latents = 1 / self.vae.config.scaling_factor * latents
-
+        if self.args.guidance_model == "zero_scope":
+            latents = latents.squeeze(2)
         imgs = self.vae.decode(latents).sample
         imgs = (imgs / 2 + 0.5).clamp(0, 1)
         
